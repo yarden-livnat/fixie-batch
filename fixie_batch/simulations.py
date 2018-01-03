@@ -5,7 +5,34 @@ managing process going down.
 """
 from collections.abc import Mapping
 
-from fixie.environ import ENV
+from pprintpp import pformat
+from lazyasd import lazyobject
+from fixie import ENV, verify_user, next_jobid
+
+
+SPAWN_XSH = """#!/usr/bin/env xonsh
+import os
+import json
+
+# variables from calling process
+jobid = {{jobid}}
+simulation = {{simulation}}
+
+# derived variables
+out = $FIXIE_JOBS
+inp = json.dumps(simulation)
+
+# run cyclus itself
+p = ![cyclus -f json -o @(out) @(inp)]
+"""
+
+
+@lazyobject
+def SPAWN_TEMPLATE():
+    """A jinja template for spawning simulations."""
+    from jinja2 import Template
+    return Template(SPAWN_XSH)
+
 
 
 def spawn(simulation, user, token, name='', project='', permisions='public',
@@ -45,6 +72,7 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
     message : str,
         Message about status
     """
+    # validate all inputs
     if not isinstance(simualtion, Mapping):
         return '', False, 'Simulation must be dict (i.e. mapping object) currently.'
     if permisions != 'public':
@@ -55,4 +83,12 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
         return '', False, 'Notifications are not supported yet.'
     if interactive:
         return '', False, 'Interactive simulation spawning is not supported yet.'
-
+    valid, msg, status = verify_user(user, token):
+    if not status or not valid:
+        return '', False, msg
+    # now we can actually spawn the simulation
+    jobid = next_jobid()
+    ctx = dict(
+            jobid=jobid,
+            simulation=pformat(simulaton),
+            )
