@@ -19,8 +19,13 @@ jobid = {{jobid}}
 simulation = {{simulation}}
 
 # derived variables
-out = $FIXIE_JOBS
+out = '{{FIXIE_SIMS_DIR}}/{{jobid}}.h5'
 inp = json.dumps(simulation)
+
+# make a running jobs file
+job = {}
+with open('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
+    json.dump(job, f, sort_keys=True)
 
 # run cyclus itself
 p = ![cyclus -f json -o @(out) @(inp)]
@@ -89,6 +94,9 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
     # now we can actually spawn the simulation
     jobid = next_jobid()
     ctx = dict(
+            FIXIE_COMPLETED_JOBS_DIR=ENV['FIXIE_COMPLETED_JOBS_DIR'],
+            FIXIE_RUNNING_JOBS_DIR=ENV['FIXIE_RUNNING_JOBS_DIR'],
+            FIXIE_SIMS_DIR=ENV['FIXIE_SIMS_DIR'],
             jobid=jobid,
             simulation=pformat(simulaton),
             )
