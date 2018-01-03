@@ -40,6 +40,7 @@ job = {
     'permissions': {{permissions}},
     'post': {{post}},
     'project': '{{project}}',
+    'queue_starttime': time.time(),
     'simulation': simulation,
     'user': '{{user}}',
     }
@@ -47,8 +48,20 @@ with open('{{FIXIE_QUEUED_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
     json.dump(job, f, sort_keys=True, indent=1)
 
 # wait for the queue to be free, and then move the jobs file
-while {{jobid}} not in queued_ids()[:{{FIXIE_NJOBS}}]:
+qids = queued_ids()
+while {{jobid}} not in qids[:{{FIXIE_NJOBS}}]:
+    if {{jobid}} not in qids:
+        # job cancels itself if it isn't in the queue at all!
+        jobs.update({'returncode': 1,
+                     'out': None,
+                     'err': 'Job canceled self after jobfile was removed from queue',
+                     'queue_endtime': time.time()})
+        with open('{{FIXIE_CANCELED_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
+            json.dump(job, f, sort_keys=True, indent=1)
+        ![exit]
     time.sleep(0.1)
+    qids = queued_ids()
+job['queue_endtime'] = time.time()
 os.remove('{{FIXIE_QUEUED_JOBS_DIR}}/{{jobid}}.json')
 with open('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
     json.dump(job, f, sort_keys=True, indent=1)
@@ -138,6 +151,7 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
     # now we can actually spawn the simulation
     jobid = next_jobid()
     ctx = dict(
+            FIXIE_CANCELED_JOBS_DIR=ENV['FIXIE_CANCELED_JOBS_DIR'],
             FIXIE_COMPLETED_JOBS_DIR=ENV['FIXIE_COMPLETED_JOBS_DIR'],
             FIXIE_FAILED_JOBS_DIR=ENV['FIXIE_FAILED_JOBS_DIR'],
             FIXIE_NJOBS=ENV['FIXIE_NJOBS'],
