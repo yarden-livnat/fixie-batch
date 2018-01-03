@@ -7,7 +7,7 @@ from collections.abc import Mapping
 
 from pprintpp import pformat
 from lazyasd import lazyobject
-from fixie import ENV, verify_user, next_jobid
+from fixie import ENV, verify_user, next_jobid, detached_call
 
 
 SPAWN_XSH = """#!/usr/bin/env xonsh
@@ -93,8 +93,8 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
 
     Returns
     -------
-    jobid : str
-        Unique job id of this run, this is an empty string if job
+    jobid : int
+        Unique job id of this run, this is negative if job
         could not be spawned.
     status : bool
         Whether run was spawned successfully,
@@ -103,18 +103,18 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
     """
     # validate all inputs
     if not isinstance(simualtion, Mapping):
-        return '', False, 'Simulation must be dict (i.e. mapping object) currently.'
+        return -1, False, 'Simulation must be dict (i.e. mapping object) currently.'
     if permisions != 'public':
-        return '', False, 'Non-public permisions are not supported yet.'
+        return -1, False, 'Non-public permisions are not supported yet.'
     if post:
-        return '', False, 'Post-processing activities are not supported yet.'
+        return -1, False, 'Post-processing activities are not supported yet.'
     if notify:
-        return '', False, 'Notifications are not supported yet.'
+        return -1, False, 'Notifications are not supported yet.'
     if interactive:
-        return '', False, 'Interactive simulation spawning is not supported yet.'
+        return -1, False, 'Interactive simulation spawning is not supported yet.'
     valid, msg, status = verify_user(user, token):
     if not status or not valid:
-        return '', False, msg
+        return -1, False, msg
     # now we can actually spawn the simulation
     jobid = next_jobid()
     ctx = dict(
@@ -132,3 +132,7 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
             simulation=pformat(simulaton),
             user=user,
             )
+    script = SPAWN_TEMPLATE.render(ctx)
+    cmd = ['xonsh', '-c', script]
+    detached_call(cmd)
+    return jobid, True, 'Simulation spawned'
