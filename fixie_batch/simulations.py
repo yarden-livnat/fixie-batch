@@ -15,20 +15,44 @@ import os
 import json
 
 # variables from calling process
-jobid = {{jobid}}
 simulation = {{simulation}}
 
 # derived variables
 out = '{{FIXIE_SIMS_DIR}}/{{jobid}}.h5'
-inp = json.dumps(simulation)
+inp = json.dumps(simulation, sort_keys=True)
 
 # make a running jobs file
-job = {}
+job = {
+    'interactive': {{interactive}},
+    'jobid': {{jobid}},
+    'notify': {{notify}},
+    'outfile': out,
+    'pid': os.getpid(),
+    'permissions': {{permissions}},
+    'post': {{post}},
+    'project': '{{project}}',
+    'simulation': simulation,
+    'user': '{{user}}',
+    }
 with open('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
     json.dump(job, f, sort_keys=True)
 
 # run cyclus itself
-p = ![cyclus -f json -o @(out) @(inp)]
+with ${...}.swap(RAISE_SUBPROC_ERROR=False):
+    proc = !(cyclus -f json -o @(out) @(inp))
+
+# update and swap job file
+job.update({
+    'returncode': proc.returncode,
+    'starttime': proc.starttime,
+    'endtime': proc.endtime,
+    'out': proc.out,
+    'err': proc.err,
+    })
+jobdir = '{{FIXIE_COMPLETED_JOBS_DIR}}' if p else '{{FIXIE_FAILED_JOBS_DIR}}'
+os.remove('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json')
+with open(jobdir + '/{{jobid}}.json', 'w') as f:
+    json.dump(job, f, sort_keys=True)
 """
 
 
@@ -95,8 +119,16 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
     jobid = next_jobid()
     ctx = dict(
             FIXIE_COMPLETED_JOBS_DIR=ENV['FIXIE_COMPLETED_JOBS_DIR'],
+            FIXIE_FAILED_JOBS_DIR=ENV['FIXIE_FAILED_JOBS_DIR'],
             FIXIE_RUNNING_JOBS_DIR=ENV['FIXIE_RUNNING_JOBS_DIR'],
             FIXIE_SIMS_DIR=ENV['FIXIE_SIMS_DIR'],
+            interactive=interactive,
             jobid=jobid,
+            name=name,
+            notify=repr(notify),
+            permissions=repr(permissions),
+            post=repr(post),
+            project=project,
             simulation=pformat(simulaton),
+            user=user,
             )
