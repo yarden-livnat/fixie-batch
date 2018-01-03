@@ -13,6 +13,15 @@ from fixie import ENV, verify_user, next_jobid, detached_call
 SPAWN_XSH = """#!/usr/bin/env xonsh
 import os
 import json
+import time
+
+
+def queued_ids():
+    # sorted jobids that are in the queue
+    qids = [int(j.name[:-5]) for j in os.scandir('{{FIXIE_QUEUED_JOBS_DIR}}')]
+    qids.sort()
+    return qids
+
 
 # variables from calling process
 simulation = {{simulation}}
@@ -21,7 +30,7 @@ simulation = {{simulation}}
 out = '{{FIXIE_SIMS_DIR}}/{{jobid}}.h5'
 inp = json.dumps(simulation, sort_keys=True)
 
-# make a running jobs file
+# make a jobs file and add it to the queue
 job = {
     'interactive': {{interactive}},
     'jobid': {{jobid}},
@@ -34,6 +43,13 @@ job = {
     'simulation': simulation,
     'user': '{{user}}',
     }
+with open('{{FIXIE_QUEUED_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
+    json.dump(job, f, sort_keys=True, indent=1)
+
+# wait for the queue to be free, and then move the jobs file
+while {{jobid}} not in queued_ids()[:{{FIXIE_NJOBS}}]:
+    time.sleep(0.1)
+os.remove('{{FIXIE_QUEUED_JOBS_DIR}}/{{jobid}}.json')
 with open('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
     json.dump(job, f, sort_keys=True, indent=1)
 
@@ -124,6 +140,8 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
     ctx = dict(
             FIXIE_COMPLETED_JOBS_DIR=ENV['FIXIE_COMPLETED_JOBS_DIR'],
             FIXIE_FAILED_JOBS_DIR=ENV['FIXIE_FAILED_JOBS_DIR'],
+            FIXIE_NJOBS=ENV['FIXIE_NJOBS'],
+            FIXIE_QUEUED_JOBS_DIR=ENV['FIXIE_QUEUED_JOBS_DIR'],
             FIXIE_RUNNING_JOBS_DIR=ENV['FIXIE_RUNNING_JOBS_DIR'],
             FIXIE_SIMS_DIR=ENV['FIXIE_SIMS_DIR'],
             interactive=interactive,
