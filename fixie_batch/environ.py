@@ -13,7 +13,7 @@ QUEUE_STATUSES = frozenset(['completed', 'failed', 'canceled', 'running'])
 
 def fixie_job_status_dir(status):
     """Ensures and returns the $FIXIE_{STATUS}_JOBS_DIR"""
-    fsjd = os.path.join(ENV.get('FIXIE_JOBS_DIR'), 'fixie', status)
+    fsjd = os.path.join(ENV.get('FIXIE_JOBS_DIR'), status)
     os.makedirs(fsjd, exist_ok=True)
     return fsjd
 

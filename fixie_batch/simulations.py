@@ -35,7 +35,7 @@ job = {
     'user': '{{user}}',
     }
 with open('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
-    json.dump(job, f, sort_keys=True)
+    json.dump(job, f, sort_keys=True, indent=1)
 
 # run cyclus itself
 with ${...}.swap(RAISE_SUBPROC_ERROR=False):
@@ -52,7 +52,7 @@ job.update({
 jobdir = '{{FIXIE_COMPLETED_JOBS_DIR}}' if p else '{{FIXIE_FAILED_JOBS_DIR}}'
 os.remove('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json')
 with open(jobdir + '/{{jobid}}.json', 'w') as f:
-    json.dump(job, f, sort_keys=True)
+    json.dump(job, f, sort_keys=True, indent=1)
 """
 
 
@@ -63,9 +63,8 @@ def SPAWN_TEMPLATE():
     return Template(SPAWN_XSH)
 
 
-
-def spawn(simulation, user, token, name='', project='', permisions='public',
-          post=(), notify=(), interactive=False):
+def spawn(simulation, user, token, name='', project='', permissions='public',
+          post=(), notify=(), interactive=False, _debug=False):
     """Spawning simulations let’s the batch execution service know to run a
     simulation as soon as possible.
 
@@ -102,17 +101,17 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
         Message about status
     """
     # validate all inputs
-    if not isinstance(simualtion, Mapping):
+    if not isinstance(simulation, Mapping):
         return -1, False, 'Simulation must be dict (i.e. mapping object) currently.'
-    if permisions != 'public':
-        return -1, False, 'Non-public permisions are not supported yet.'
+    if permissions != 'public':
+        return -1, False, 'Non-public permissions are not supported yet.'
     if post:
         return -1, False, 'Post-processing activities are not supported yet.'
     if notify:
         return -1, False, 'Notifications are not supported yet.'
     if interactive:
         return -1, False, 'Interactive simulation spawning is not supported yet.'
-    valid, msg, status = verify_user(user, token):
+    valid, msg, status = verify_user(user, token)
     if not status or not valid:
         return -1, False, msg
     # now we can actually spawn the simulation
@@ -129,10 +128,16 @@ def spawn(simulation, user, token, name='', project='', permisions='public',
             permissions=repr(permissions),
             post=repr(post),
             project=project,
-            simulation=pformat(simulaton),
+            simulation=pformat(simulation),
             user=user,
             )
     script = SPAWN_TEMPLATE.render(ctx)
+    if _debug:
+        print(script)
+        import os
+        fname = os.path.join(ENV['FIXIE_RUNNING_JOBS_DIR'], str(jobid) + '.xsh')
+        with open(fname, 'w') as f:
+            f.write(script)
     cmd = ['xonsh', '-c', script]
     detached_call(cmd)
     return jobid, True, 'Simulation spawned'
