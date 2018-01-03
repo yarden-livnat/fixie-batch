@@ -1,6 +1,7 @@
 """Tests batch simulation execution functionality"""
 import os
 import json
+import time
 
 from fixie import ENV, waitpid
 
@@ -64,3 +65,32 @@ def test_spawn(xdg, verify_user):
     assert 'out' in job
     assert 'err' in job
     assert  0 == job['returncode']
+
+
+def test_self_canceling_queue(xdg, verify_user):
+    """Tests that a job will cancel itself if its jobfile in the queue is
+    externally removed.
+    """
+    ENV['FIXIE_NJOBS'] = 0
+    jobid, status, msg, pid = spawn(SIMULATION, 'me', '42', return_pid=True)
+    assert jobid == 0
+    assert status
+    assert msg == 'Simulation spawned'
+    assert pid >= 0
+    # make sure job is in the queue
+    while len(os.listdir(ENV['FIXIE_QUEUED_JOBS_DIR'])) == 0:
+        time.sleep(0.001)
+    jobfile = ENV['FIXIE_QUEUED_JOBS_DIR'] + '/0.json'
+    assert os.path.exists(jobfile)
+    # remove the jobfile and wait for the job to finish
+    os.remove(jobfile)
+    waitpid(pid, timeout=2.0)
+    # job should now be in canceled
+    jobfile = ENV['FIXIE_CANCELED_JOBS_DIR'] + '/0.json'
+    assert os.path.exists(jobfile)
+    with open(jobfile) as f:
+        job = json.load(f)
+    # test that the job is well formed.
+    assert 1 == job['returncode']
+    assert 'out' in job
+    assert 'err' in job

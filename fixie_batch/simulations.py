@@ -52,13 +52,15 @@ qids = queued_ids()
 while {{jobid}} not in qids[:{{FIXIE_NJOBS}}]:
     if {{jobid}} not in qids:
         # job cancels itself if it isn't in the queue at all!
-        jobs.update({'returncode': 1,
-                     'out': None,
-                     'err': 'Job canceled self after jobfile was removed from queue',
-                     'queue_endtime': time.time()})
+        err = 'Job canceled itself after jobfile was removed from queue'
+        job.update({'returncode': 1,
+                    'out': None,
+                    'err': err,
+                    'queue_endtime': time.time()})
         with open('{{FIXIE_CANCELED_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
             json.dump(job, f, sort_keys=True, indent=1)
-        ![exit]
+        import sys
+        sys.exit(err)
     time.sleep(0.1)
     qids = queued_ids()
 job['queue_endtime'] = time.time()
