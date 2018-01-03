@@ -49,7 +49,7 @@ job.update({
     'out': proc.out,
     'err': proc.err,
     })
-jobdir = '{{FIXIE_COMPLETED_JOBS_DIR}}' if p else '{{FIXIE_FAILED_JOBS_DIR}}'
+jobdir = '{{FIXIE_COMPLETED_JOBS_DIR}}' if proc else '{{FIXIE_FAILED_JOBS_DIR}}'
 os.remove('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json')
 with open(jobdir + '/{{jobid}}.json', 'w') as f:
     json.dump(job, f, sort_keys=True, indent=1)
@@ -64,7 +64,7 @@ def SPAWN_TEMPLATE():
 
 
 def spawn(simulation, user, token, name='', project='', permissions='public',
-          post=(), notify=(), interactive=False, _debug=False):
+          post=(), notify=(), interactive=False, return_pid=False):
     """Spawning simulations let’s the batch execution service know to run a
     simulation as soon as possible.
 
@@ -89,6 +89,9 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
         Any notifications to register, not currently supported
     interactive : bool, optional
         True or False (default), not currently supported.
+    return_pid : bool, optional
+        Whether or not to return the PID of the detached child process.
+        Default False, this is mostly for testing.
 
     Returns
     -------
@@ -97,8 +100,10 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
         could not be spawned.
     status : bool
         Whether run was spawned successfully,
-    message : str,
+    message : str
         Message about status
+    pid : int, if return_pid is True
+        Child process id.
     """
     # validate all inputs
     if not isinstance(simulation, Mapping):
@@ -132,12 +137,9 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
             user=user,
             )
     script = SPAWN_TEMPLATE.render(ctx)
-    if _debug:
-        print(script)
-        import os
-        fname = os.path.join(ENV['FIXIE_RUNNING_JOBS_DIR'], str(jobid) + '.xsh')
-        with open(fname, 'w') as f:
-            f.write(script)
     cmd = ['xonsh', '-c', script]
-    detached_call(cmd)
-    return jobid, True, 'Simulation spawned'
+    pid = detached_call(cmd)
+    rtn = (jobid, True, 'Simulation spawned')
+    if return_pid:
+        rtn += (pid,)
+    return rtn
