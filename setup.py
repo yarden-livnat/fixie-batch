@@ -28,7 +28,7 @@ setup_kwargs = {
     }
 
 if HAVE_SETUPTOOLS:
-    setup_kwargs['install_requires'] = ['fixie', 'pprintpp']
+    setup_kwargs['install_requires'] = ['fixie', 'pprintpp', 'jinja2']
 
 
 if __name__ == '__main__':

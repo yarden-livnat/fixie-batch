@@ -10,7 +10,7 @@ $VERSION_BUMP_PATTERNS = [
 $CHANGELOG_FILENAME = 'CHANGELOG.rst'
 $CHANGELOG_TEMPLATE = 'TEMPLATE.rst'
 
-$DOCKER_CONDA_DEPS = ['fixie', 'pprintpp', 'pytest', 'pytest-tornado']
+$DOCKER_CONDA_DEPS = ['fixie', 'pprintpp', 'pytest', 'pytest-tornado', 'jinja2']
 $DOCKER_INSTALL_COMMAND = 'git clean -fdx && ./setup.py install'
 
 $CONDA_FORGE_SOURCE_URL = 'https://pypi.io/packages/source/f/$PROJECT/$PROJECT-$VERSION.tar.gz'
