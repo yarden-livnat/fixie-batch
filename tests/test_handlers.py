@@ -79,3 +79,37 @@ def test_cancel_valid(xdg, verify_user, http_client, base_url):
     assert exp == obs
 
 
+@pytest.mark.gen_test
+def test_query_valid(xdg, http_client, base_url):
+    url = base_url + '/query'
+    exp = {'data': [], 'status': True, 'message': 'Jobs queried'}
+    # test all query
+    body = {}
+    obs = yield fetch(url, body)
+    assert exp == obs
+    # test statuses
+    body = {'statuses': ['canceled', 'running']}
+    obs = yield fetch(url, body)
+    assert exp == obs
+    # test jobs
+    body = {'jobs': [42, 'myjob']}
+    obs = yield fetch(url, body)
+    assert exp == obs
+    # test users
+    body = {'users': ['me', 'you']}
+    obs = yield fetch(url, body)
+    assert exp == obs
+    # test jobs
+    body = {'jobs': [42, 'myjob']}
+    obs = yield fetch(url, body)
+    assert exp == obs
+    # test jobs
+    body = {'jobs': [42, 'myjob']}
+    obs = yield fetch(url, body)
+    assert exp == obs
+    # test projects
+    body = {'projects': ['p0', 'p1']}
+    obs = yield fetch(url, body)
+    assert exp == obs
+
+
