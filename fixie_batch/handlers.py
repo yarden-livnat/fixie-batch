@@ -27,6 +27,22 @@ class Spawn(RequestHandler):
         self.write(response)
 
 
+class Cancel(RequestHandler):
+
+    schema = {'job': {'anyof_type': ['integer', 'string'], 'required': True},
+              'user': {'type': 'string', 'empty': False, 'required': True},
+              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
+              'project': {'type': 'string'},
+              }
+    response_keys = ('jobid', 'status', 'message')
+
+    def post(self):
+        resp = cancel(**self.request.arguments)
+        response = dict(zip(self.response_keys, resp))
+        self.write(response)
+
+
 HANDLERS = [
     ('/spawn', Spawn),
+    ('/cancel', Cancel),
 ]

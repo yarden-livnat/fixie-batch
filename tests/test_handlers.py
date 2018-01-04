@@ -1,9 +1,12 @@
 """Tests handlers object."""
+import os
+import time
+
 import pytest
 import tornado.web
 from tornado.httpclient import HTTPError
 from fixie import json
-from fixie import fetch
+from fixie import ENV, fetch
 
 from fixie_batch.handlers import HANDLERS
 
@@ -57,3 +60,22 @@ def test_spawn_valid(xdg, verify_user, http_client, base_url):
     exp = {'jobid': 0, 'status': True, 'message': 'Simulation spawned'}
     obs = yield fetch(url, body)
     assert exp == obs
+
+
+@pytest.mark.gen_test
+def test_cancel_valid(xdg, verify_user, http_client, base_url):
+    # spawn a job, but don't allow it to run
+    ENV['FIXIE_NJOBS'] = 0
+    url = base_url + '/spawn'
+    body = {"user": "inigo", "token": "42", 'simulation': SIMULATION}
+    _ = yield fetch(url, body)
+    while len(os.listdir(ENV['FIXIE_QUEUED_JOBS_DIR'])) == 0:
+        time.sleep(0.001)
+    # now cancel the job
+    url = base_url + '/cancel'
+    body = {"user": "inigo", "token": "42", "job": 0}
+    exp = {'jobid': 0, 'status': True, 'message': 'Job canceled'}
+    obs = yield fetch(url, body)
+    assert exp == obs
+
+
