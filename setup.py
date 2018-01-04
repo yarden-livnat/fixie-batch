@@ -7,7 +7,7 @@ except ImportError:
     HAVE_SETUPTOOLS = False
 
 
-VERSION = '0.0.0'
+VERSION = '0.0.1'
 
 setup_kwargs = {
     "version": VERSION,
