@@ -5,7 +5,7 @@ import time
 
 from fixie import ENV, waitpid
 
-from fixie_batch.simulations import spawn, cancel
+from fixie_batch.simulations import spawn, cancel, query
 
 
 SIMULATION = {
@@ -42,7 +42,6 @@ SIMULATION = {
   },
  },
 }
-
 
 
 def test_spawn(xdg, verify_user):
@@ -123,3 +122,70 @@ def test_cancel(xdg, verify_user):
     assert 1 == job['returncode']
     assert 'out' in job
     assert 'err' in job
+
+
+def _jobfile(status, jobid):
+    d = ENV['FIXIE_{0}_JOBS_DIR'.format(status.upper())]
+    jobfile = os.path.join(d, str(jobid) + '.json')
+    return jobfile
+
+
+def test_query(xdg):
+    # mock up some jobs
+    jobs = [
+        (0, 'completed', 'aperson', 'p0'),
+        (1, 'failed', 'bperson', 'p1'),
+        (2, 'canceled', 'aperson', 'p2'),
+        (3, 'running', 'cperson', 'p0'),
+        (4, 'queued', 'dperson', 'p3'),
+        ]
+    # write out mock jobs
+    exp = []
+    for jobid, status, user, project in jobs:
+        jobfile = _jobfile(status, jobid)
+        job = {'jobid': jobid, 'user': user, 'project': project}
+        with open(jobfile, 'w') as f:
+            json.dump(job, f)
+        job['status'] = status
+        exp.append(job)
+    # test all query
+    obs, flag, msg = query()
+    assert exp == obs
+    # test one status
+    obs, flag, msg = query(statuses='completed')
+    assert exp[:1] == obs
+    # test two statuses
+    obs, flag, msg = query(statuses={'completed', 'failed'})
+    assert exp[:2] == obs
+    # test one user
+    obs, flag, msg = query(users='bperson')
+    assert [exp[1]] == obs
+    # test two users
+    obs, flag, msg = query(users={'aperson', 'bperson'})
+    assert exp[:3] == obs
+    # test statuses and users
+    obs, flag, msg = query(statuses={'completed', 'failed'}, users={'aperson', 'bperson'})
+    assert exp[:2] == obs
+    # test one job
+    obs, flag, msg = query(jobs=0)
+    assert exp[:1] == obs
+    # test two jobs
+    obs, flag, msg = query(jobs={0, 1})
+    assert exp[:2] == obs
+    # test statuses and users
+    obs, flag, msg = query(statuses={'completed', 'failed'}, jobs={0, 1, 4})
+    assert exp[:2] == obs
+    # test one project
+    obs, flag, msg = query(projects='p1')
+    assert [exp[1]] == obs
+    # test two projects
+    obs, flag, msg = query(projects={'p1', 'p0'})
+    assert [exp[0], exp[1], exp[3]] == obs
+    # test projects and users
+    obs, flag, msg = query(users={'aperson', 'bperson'}, projects={'p1', 'p0'})
+    assert exp[:2] == obs
+    # test all
+    obs, flag, msg = query(users={'aperson', 'bperson'}, projects={'p1', 'p0'},
+                           jobs={0, 1, 4}, statuses={'completed', 'failed', 'running'})
+    assert exp[:2] == obs
+

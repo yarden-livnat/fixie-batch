@@ -197,7 +197,7 @@ def {status}_ids():
     return ids
 
 
-STATUS_IDS[{status}] = {status}_ids
+STATUS_IDS['{status}'] = {status}_ids
 """
 g = globals()
 for status in QUEUE_STATUSES:
@@ -261,8 +261,13 @@ def cancel(job, user, token, project=''):
     for d in status_dirs:
         jobfile = os.path.join(d, base)
         if os.path.exists(jobfile):
+            # can't just do a normal read here, since we may be trying to cancel
+            # a job that hasn't been fully written yet.
+            s = ''
             with open(jobfile) as f:
-                data = json.load(f)
+                while not s:
+                    s = f.read()
+            data = json.loads(s)
             break
     else:
         return -1, False, 'Job file could not be cound in queue or running.'
@@ -288,6 +293,9 @@ def cancel(job, user, token, project=''):
 
 
 def _convert_to_statuses_set(statuses):
+    """Returns a set of valid statuses AND an error message.
+    On failure, the set of statues will be None.
+    """
     if isinstance(statuses, str):
         statuses = {statuses}
     s = set()
@@ -301,6 +309,52 @@ def _convert_to_statuses_set(statuses):
         else:
             s.add(status)
     return s, ''
+
+
+def _ensure_set_of_str_or_none(x):
+    """Returns an object that is a set of str or None AND an error message.
+    On failure, the error message will be non-empty.
+    """
+    if x is None:
+        return x, ''
+    elif isinstance(x, str):
+        return set([x]), ''
+    elif isinstance(x, Set):
+        for e in x:
+            if not isinstance(e, str):
+                return None, '{0!r} is not a string'.format(e)
+        return x, ''
+    else:
+        y = set()
+        for e in x:
+            if not isinstance(e, str):
+                return None, '{0!r} is not a string'.format(e)
+            y.add(e)
+        return y, ''
+
+
+def _load_job(jobid, hint):
+    """Loads a job from a jobid and a hint about which status queue it might
+    be in. Returns a job dict or None (if the job could not be found), and the
+    status the job was found in.
+    """
+    t = 'FIXIE_{0}_JOBS_DIR'
+    base = str(jobid) + '.json'
+    # first try the hint
+    jobfile = os.path.join(ENV[t.format(hint.upper())], base)
+    if os.path.exists(jobfile):
+        with open(jobfile) as f:
+            job = json.load(f)
+        return job, hint
+    # couldn't find in the hint, search other statuses.
+    for status in QUEUE_STATUSES:
+        jobfile = os.path.join(ENV[t.format(status.upper())], base)
+        if os.path.exists(jobfile):
+            with open(jobfile) as f:
+                job = json.load(f)
+            return job, status
+    else:
+        return None, None
 
 
 def query(statuses='all', users=None, jobs=None, projects=None):
@@ -329,6 +383,12 @@ def query(statuses='all', users=None, jobs=None, projects=None):
     message : str
         Message related to the status of the query
     """
+    users, msg = _ensure_set_of_str_or_none(users)
+    if msg:
+        return None, False, msg
+    projects, msg = _ensure_set_of_str_or_none(projects)
+    if msg:
+        return None, False, msg
     # get job ids from statuses
     statuses, msg = _convert_to_statuses_set(statuses)
     if statuses is None:
@@ -344,7 +404,11 @@ def query(statuses='all', users=None, jobs=None, projects=None):
         # since jobs was not provided, we want the maximal set
         # this happens to be at most the job ids we have already found
         jids = sids
+    elif isinstance(jobs, int):
+        jids = jobs = set([jobs])
     else:
+        if isinstance(jobs, str):
+            jobs = set([jobs])
         jids = set()
         for job in jobs:
             if isinstance(job, int):
@@ -354,3 +418,18 @@ def query(statuses='all', users=None, jobs=None, projects=None):
             else:
                 msg = 'type of job not reconized: {0} {1}'
                 return None, False, msg.format(job, type(job))
+    # Now load the jobfiles and filter based on user and project
+    data = []
+    jobids = sids & jids
+    for jobid in sorted(jobids):
+        job, status = _load_job(jobid, ids_to_status[jobid])
+        if job is None:
+            continue
+        if users is not None and job['user'] not in users:
+            continue
+        if projects is not None and job['project'] not in projects:
+            continue
+        job['status'] = status
+        data.append(job)
+    return data, True, 'Jobs queried'
+
