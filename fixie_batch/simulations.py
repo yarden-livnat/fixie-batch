@@ -7,12 +7,12 @@ import os
 import json
 import time
 import signal
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 
 from pprintpp import pformat
 from lazyasd import lazyobject
 from fixie import (ENV, verify_user, next_jobid, detached_call,
-    register_job_alias, jobids_from_alias)
+    register_job_alias, jobids_from_alias, jobids_with_name)
 
 from fixie_batch.environ import QUEUE_STATUSES
 
@@ -188,11 +188,16 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
     return rtn
 
 
+STATUS_IDS = {}
+
 t = """
 def {status}_ids():
     "Set of {status} jobids."
     ids = {{int(j.name[:-5]) for j in os.scandir(ENV['FIXIE_{STATUS}_JOBS_DIR'])}}
     return ids
+
+
+STATUS_IDS[{status}] = {status}_ids
 """
 g = globals()
 for status in QUEUE_STATUSES:
@@ -280,3 +285,72 @@ def cancel(job, user, token, project=''):
     with open(jobfile, 'w') as f:
         json.dump(data, f, sort_keys=True, indent=1)
     return jobid, True, 'Job canceled'
+
+
+def _convert_to_statuses_set(statuses):
+    if isinstance(statuses, str):
+        statuses = {statuses}
+    s = set()
+    for status in statuses:
+        if status == 'all':
+            s |= QUEUE_STATUSES
+        elif not isinstance(status, str):
+            return None, 'status must be a string, got ' + repr(status)
+        elif status not in QUEUE_STATUSES:
+            return None, status + ' is not a valid status'
+        else:
+            s.add(status)
+    return s, ''
+
+
+def query(statuses='all', users=None, jobs=None, projects=None):
+    """Returns the state of the jobs, filtered as approriate.
+
+    Parameters
+    ----------
+    statuses : str or set of str, optional
+        Which queue statuses we should pull jobs from. If 'all', every status queue is
+        searched. If a set of str is provided, the statuses are ORed together.
+    users : str, set of str, or None, optional
+        User name(s) to filter on. If None, all user names are used. User names
+        are ORed together, if multiple are provided.
+    jobs : int, str, set of ints & strs, or None, optional
+        The jobids and job names to filter on, if provided.  If None, filtering
+        on job id/name is not done. These are ORed together.
+    projects : str, set of str, or None, optional
+        Project names to filer on, if not None. These are ORed together.
+
+    Returns
+    -------
+    data : list of dicts or None
+        The list of all jobs found. None if status is False.
+    status : bool
+        Whether or not the query was successful.
+    message : str
+        Message related to the status of the query
+    """
+    # get job ids from statuses
+    statuses, msg = _convert_to_statuses_set(statuses)
+    if statuses is None:
+        return None, False, msg
+    sids = set()  # all ids joined together
+    ids_to_status = {}  # ids mapped to the status found
+    for status in statuses:
+        s = STATUS_IDS[status]()
+        sids |= s
+        ids_to_status.update({i: status for i in s})
+    # get job ids from jobs
+    if jobs is None:
+        # since jobs was not provided, we want the maximal set
+        # this happens to be at most the job ids we have already found
+        jids = sids
+    else:
+        jids = set()
+        for job in jobs:
+            if isinstance(job, int):
+                jids.add(job)
+            elif isinstance(job, str):
+                jids |= jobids_with_name(job)
+            else:
+                msg = 'type of job not reconized: {0} {1}'
+                return None, False, msg.format(job, type(job))
