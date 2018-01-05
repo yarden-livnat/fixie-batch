@@ -64,6 +64,9 @@ def test_spawn(xdg, verify_user):
     assert 'out' in job
     assert 'err' in job
     assert  0 == job['returncode']
+    # test that a pending path file was created
+    pp = ENV['FIXIE_PATHS_DIR'] + '/me-0-pending-path.json'
+    assert os.path.exists(pp)
 
 
 def test_self_canceling_queue(xdg, verify_user):

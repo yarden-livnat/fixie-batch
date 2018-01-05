@@ -12,7 +12,7 @@ from collections.abc import Mapping, Set
 from pprintpp import pformat
 from lazyasd import lazyobject
 from fixie import (ENV, verify_user, next_jobid, detached_call,
-    register_job_alias, jobids_from_alias, jobids_with_name)
+    register_job_alias, jobids_from_alias, jobids_with_name, default_path)
 
 from fixie_batch.environ import QUEUE_STATUSES
 
@@ -43,6 +43,7 @@ job = {
     'jobid': {{jobid}},
     'notify': {{notify}},
     'outfile': out,
+    'path': '{{path}}',
     'pid': os.getpid(),
     'permissions': {{permissions}},
     'post': {{post}},
@@ -75,6 +76,18 @@ os.remove('{{FIXIE_QUEUED_JOBS_DIR}}/{{jobid}}.json')
 with open('{{FIXIE_RUNNING_JOBS_DIR}}/{{jobid}}.json', 'w') as f:
     json.dump(job, f, sort_keys=True, indent=1)
 
+# make a pending path file, to signal that a path is available.
+pending_path = {
+    'file': out,
+    'holding': {{FIXIE_HOLDING_TIME}},
+    'jobid': {{jobid}},
+    'path': '{{path}}',
+    'project': '{{project}}',
+    'user': '{{user}}',
+    }
+with open('{{FIXIE_PATHS_DIR}}/{{user}}-{{jobid}}-pending-path.json', 'w') as f:
+    json.dump(pending_path, f, sort_keys=True, indent=1)
+
 # run cyclus itself
 with ${...}.swap(RAISE_SUBPROC_ERROR=False):
     proc = !(cyclus -f json -o @(out) @(inp))
@@ -101,8 +114,9 @@ def SPAWN_TEMPLATE():
     return Template(SPAWN_XSH)
 
 
-def spawn(simulation, user, token, name='', project='', permissions='public',
-          post=(), notify=(), interactive=False, return_pid=False):
+def spawn(simulation, user, token, name='', project='', path='',
+          permissions='public', post=(), notify=(), interactive=False,
+          return_pid=False):
     """Spawning simulations let’s the batch execution service know to run a
     simulation as soon as possible.
 
@@ -118,6 +132,10 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
         Alias for simulation, default ''
     project : str, optional
         Name of the project, default ''
+    path : str, optional
+        Path to suggest for output file. An empty string will apply
+        a default path name, which depends on the simulation name,
+        the project name, and the jobid.
     permissions : str or list of str, optional
         "public" (default), "private", or a list of users. Currently only
         public permissions are supported.
@@ -159,11 +177,16 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
         return -1, False, msg
     # now we can actually spawn the simulation
     jobid = next_jobid()
+    path = default_path(path, name=name, project=project, jobid=jobid)
+    holding = "'inf'" if ENV['FIXIE_HOLDING_TIME'] == float('inf') \
+                      else ENV['FIXIE_HOLDING_TIME']
     ctx = dict(
             FIXIE_CANCELED_JOBS_DIR=ENV['FIXIE_CANCELED_JOBS_DIR'],
             FIXIE_COMPLETED_JOBS_DIR=ENV['FIXIE_COMPLETED_JOBS_DIR'],
             FIXIE_FAILED_JOBS_DIR=ENV['FIXIE_FAILED_JOBS_DIR'],
+            FIXIE_HOLDING_TIME=holding,
             FIXIE_NJOBS=ENV['FIXIE_NJOBS'],
+            FIXIE_PATHS_DIR=ENV['FIXIE_PATHS_DIR'],
             FIXIE_QUEUED_JOBS_DIR=ENV['FIXIE_QUEUED_JOBS_DIR'],
             FIXIE_RUNNING_JOBS_DIR=ENV['FIXIE_RUNNING_JOBS_DIR'],
             FIXIE_SIMS_DIR=ENV['FIXIE_SIMS_DIR'],
@@ -171,6 +194,7 @@ def spawn(simulation, user, token, name='', project='', permissions='public',
             jobid=jobid,
             name=name,
             notify=repr(notify),
+            path=path,
             permissions=repr(permissions),
             post=repr(post),
             project=project,
