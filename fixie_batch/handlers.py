@@ -11,6 +11,7 @@ class Spawn(RequestHandler):
               'user': {'type': 'string', 'empty': False, 'required': True},
               'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
               'name': {'type': 'string'},
+              'path': {'type': 'string'},
               'project': {'type': 'string'},
               'permissions': {'anyof': [
                 {'type': 'string', 'allowed': ['public', 'private']},
