@@ -3,7 +3,8 @@ $GITHUB_ORG = 'ergs'
 
 $ACTIVITIES = [
     #'pytest',  # requires new version of cyclus to be released
-    'version_bump', 'changelog', 'tag', 'push_tag', 'pypi', 'ghrelease']
+    'version_bump', 'changelog', 'tag', 'push_tag',
+    'pypi', 'conda_forge', 'ghrelease']
 
 $VERSION_BUMP_PATTERNS = [
     ('setup.py', 'VERSION\s*=.*', "VERSION = '$VERSION'"),
