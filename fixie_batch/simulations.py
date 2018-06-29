@@ -114,7 +114,21 @@ def SPAWN_TEMPLATE():
     return Template(SPAWN_XSH)
 
 
-def spawn(simulation, user, token, name='', project='', path='',
+def queued_ids():
+    # sorted jobids that are in the queue
+    qids = [int(j.name[:-5]) for j in os.scandir(ENV['FIXIE_QUEUED_JOBS_DIR'])]
+    qids.sort()
+    return qids
+
+
+def running_ids():
+    # sorted jobids that are runnings
+    qids = [int(j.name[:-5]) for j in os.scandir(ENV['FIXIE_RUNNING_JOBS_DIR'])]
+    qids.sort()
+    return qids
+
+
+def run(simulation, user, name='', project='', path='',
           permissions='public', post=(), notify=(), interactive=False,
           return_pid=False):
     """Spawning simulations let’s the batch execution service know to run a
@@ -126,8 +140,6 @@ def spawn(simulation, user, token, name='', project='', path='',
         Cyclus simulation, currently only dict methods are supported
     user : str
         Name of the user
-    token : str
-        Credential token for the user
     name : str, optional
         Alias for simulation, default ''
     project : str, optional
@@ -172,9 +184,6 @@ def spawn(simulation, user, token, name='', project='', path='',
         return -1, False, 'Notifications are not supported yet.'
     if interactive:
         return -1, False, 'Interactive simulation spawning is not supported yet.'
-    valid, msg, status = verify_user(user, token)
-    if not status or not valid:
-        return -1, False, msg
     # now we can actually spawn the simulation
     jobid = next_jobid()
     path = default_path(path, name=name, project=project, jobid=jobid)
@@ -202,11 +211,14 @@ def spawn(simulation, user, token, name='', project='', path='',
             user=user,
             )
     script = SPAWN_TEMPLATE.render(ctx)
+    with open('/Users/yarden/script.sh', 'w') as f:
+        f.write(script)
+
     cmd = ['xonsh', '-c', script]
     pid = detached_call(cmd)
     if name or project:
         register_job_alias(jobid, user, name=name, project=project)
-    rtn = (jobid, True, 'Simulation spawned')
+    rtn = (jobid, True, 'queued')
     if return_pid:
         rtn += (pid,)
     return rtn
@@ -229,7 +241,7 @@ for status in QUEUE_STATUSES:
 del g, t, status
 
 
-def cancel(job, user, token, project=''):
+def cancel(job, user, project=''):
     """Cancels a job that is queued or running.
 
     Parameters
@@ -239,8 +251,6 @@ def cancel(job, user, token, project=''):
         a job name, and a jobid is looked up via the aliases cache.
     user : str
         Name of the user
-    token : str
-        Credential token for the user
     project : str, optional
         Name of the project, default '', only used with alias lookup.
 
@@ -254,10 +264,7 @@ def cancel(job, user, token, project=''):
     message : str
         Message about status
     """
-    # verify users
-    valid, msg, status = verify_user(user, token)
-    if not status or not valid:
-        return -1, False, msg
+
     # get jobids
     qids = queued_ids()
     rids = running_ids()
@@ -294,7 +301,7 @@ def cancel(job, user, token, project=''):
             data = json.loads(s)
             break
     else:
-        return -1, False, 'Job file could not be cound in queue or running.'
+        return -1, False, 'Job file could not be found in queue or running.'
     # kill the job and transfer job to canceled dir
     if user != data['user']:
         return jobid, False, 'User did not start job, cannot cancel it!'

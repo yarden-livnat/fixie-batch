@@ -7,7 +7,7 @@ except ImportError:
     HAVE_SETUPTOOLS = False
 
 
-VERSION = '0.0.2'
+VERSION = '0.0.3'
 
 setup_kwargs = {
     "version": VERSION,
@@ -28,7 +28,7 @@ setup_kwargs = {
     }
 
 if HAVE_SETUPTOOLS:
-    setup_kwargs['install_requires'] = ['fixie', 'pprintpp', 'jinja2']
+    setup_kwargs['install_requires'] = ['fixie', 'fixie-creds','pprintpp', 'jinja2']
 
 
 if __name__ == '__main__':

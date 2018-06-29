@@ -8,40 +8,7 @@ from fixie import ENV, waitpid
 from fixie_batch.simulations import spawn, cancel, query
 
 
-SIMULATION = {
- 'simulation': {
-  'archetypes': {
-   'spec': [
-    {'lib': 'agents', 'name': 'Sink'},
-    {'lib': 'agents', 'name': 'NullRegion'},
-    {'lib': 'agents', 'name': 'NullInst'},
-   ],
-  },
-  'control': {
-   'duration': 2,
-   'startmonth': 1,
-   'startyear': 2000,
-  },
-  'facility': {
-   'config': {'Sink': {'capacity': '1.00', 'in_commods': {'val': 'commodity'}}},
-   'name': 'Sink',
-  },
-  'recipe': {
-   'basis': 'mass',
-   'name': 'commod_recipe',
-   'nuclide': {'comp': '1', 'id': 'H1'},
-  },
-  'region': {
-   'config': {'NullRegion': None},
-   'institution': {
-    'config': {'NullInst': None},
-    'initialfacilitylist': {'entry': {'number': '1', 'prototype': 'Sink'}},
-    'name': 'SingleInstitution',
-   },
-   'name': 'SingleRegion',
-  },
- },
-}
+
 
 
 def test_spawn(xdg, verify_user):

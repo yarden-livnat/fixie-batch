@@ -1,15 +1,14 @@
 """Tornado handlers for interfacing with fixie batch execution."""
 from fixie import RequestHandler
+import fixie_creds
 
 from fixie_batch.environ import QUEUE_STATUSES
-from fixie_batch.simulations import spawn, cancel, query
+from fixie_batch.simulations import run, cancel, query
 
 
-class Spawn(RequestHandler):
+class Run(RequestHandler):
 
     schema = {'simulation': {'anyof_type': ['dict', 'string'], 'required': True},
-              'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
               'name': {'type': 'string'},
               'path': {'type': 'string'},
               'project': {'type': 'string'},
@@ -23,8 +22,9 @@ class Spawn(RequestHandler):
               }
     response_keys = ('jobid', 'status', 'message')
 
+    @fixie_creds.authenticated
     def post(self):
-        resp = spawn(**self.request.arguments)
+        resp = run(user=self.get_current_user(), **self.request.arguments)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
@@ -32,14 +32,13 @@ class Spawn(RequestHandler):
 class Cancel(RequestHandler):
 
     schema = {'job': {'anyof_type': ['integer', 'string'], 'required': True},
-              'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
               'project': {'type': 'string'},
               }
     response_keys = ('jobid', 'status', 'message')
 
+    @fixie_creds.authenticated
     def post(self):
-        resp = cancel(**self.request.arguments)
+        resp = cancel(user=self.get_current_user(), **self.request.arguments)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
@@ -72,6 +71,7 @@ class Query(RequestHandler):
               }
     response_keys = ('data', 'status', 'message')
 
+    @fixie_creds.authenticated
     def post(self):
         resp = query(**self.request.arguments)
         response = dict(zip(self.response_keys, resp))
@@ -79,7 +79,7 @@ class Query(RequestHandler):
 
 
 HANDLERS = [
-    ('/spawn', Spawn),
+    ('/run', Run),
     ('/cancel', Cancel),
     ('/query', Query),
 ]
